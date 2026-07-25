@@ -1,4 +1,9 @@
-// Bot entry point. Starts long-polling.
+по итогу получается так?
+
+// Bot entry point. Starts long-polling. Stateless: sessions live in Redis,
+// queues in Redis, persistent data in Postgres. Multiple instances can run
+// behind a load balancer (use webhooks in prod; polling is fine for dev).
+
 import { Telegraf, session } from "telegraf";
 import { env } from "../config/env.js";
 import { RedisSessionStore, type SessionData } from "./session.js";
@@ -10,48 +15,38 @@ import { ProxyPool } from "../parsers/proxy-pool.js";
 import { schedulePriceAlertJob } from "../queues/workers/price-alert.worker.js";
 import { logger } from "../utils/logger.js";
 import { disconnectPrisma } from "../db/prisma.js";
+import { Redis } from 'ioredis';
 
 async function bootstrap(): Promise<void> {
   console.log('🔄 1. Запуск bootstrap() в боте');
   const bot = new Telegraf<BotContext>(env.botToken);
   console.log('🔄 2. Бот создан');
 
-  // Шаг 1: Удаляем вебхук (если был)
-  console.log('🔄 Удаляем вебхук...');
-  try {
-    await bot.telegram.deleteWebhook();
-    console.log('✅ Вебхук удалён');
-  } catch (e) {
-    console.log('⚠️ Ошибка удаления вебхука:', (e as Error).message);
-  }
+  // Блокировка для предотвращения множественных запусков
+const redis = new Redis(env.redisUrl);
+const lockKey = 'bot:running';
+const lockValue = process.pid.toString();
+const lockTtl = 60; // секунд
 
-  // Шаг 2: Принудительно завершаем все старые long-polling сеансы
-  console.log('🔄 Завершаем старые обновления...');
-  try {
-    // Получаем последнее обновление
-    const updates = await bot.telegram.callApi('getUpdates', { limit: 1 });
-    if (updates && Array.isArray(updates) && updates.length > 0) {
-      const lastUpdateId = (updates[0] as any).update_id;
-      // Устанавливаем offset = lastUpdateId + 1
-      await bot.telegram.callApi('getUpdates', { offset: lastUpdateId + 1, limit: 0 });
-      console.log(`✅ Старые обновления завершены, offset=${lastUpdateId + 1}`);
-    } else {
-      console.log('✅ Нет старых обновлений');
-    }
-  } catch (e) {
-    console.log('⚠️ Ошибка при завершении старых обновлений:', (e as Error).message);
-  }
+// Пытаемся установить блокировку
+const acquired = await redis.set(lockKey, lockValue, 'EX', lockTtl, 'NX');
+if (!acquired) {
+  console.log('❌ Бот уже запущен в другом процессе. Завершаюсь.');
+  await redis.quit();
+  process.exit(0);
+}
+console.log('✅ Блокировка получена, запускаю бота...');
 
-  // Шаг 3: Останавливаем возможный предыдущий процесс
-  console.log('🔄 Останавливаем возможный старый процесс...');
-  try {
-    await bot.stop();
-    console.log('✅ Предыдущий процесс остановлен');
-  } catch (e) {
-    console.log('⚠️ Не удалось остановить предыдущий процесс (скорее всего, его нет)');
+// При завершении бота удаляем блокировку
+const releaseLock = async () => {
+  const current = await redis.get(lockKey);
+  if (current === lockValue) {
+    await redis.del(lockKey);
   }
+  await redis.quit();
+};
 
-  // Redis-backed sessions
+  // Redis-backed sessions → stateless across instances.
   bot.use(
     session({
       store: new RedisSessionStore(),
@@ -62,51 +57,23 @@ async function bootstrap(): Promise<void> {
   registerHandlers(bot);
   bot.catch(errorHandler(bot));
 
+  // Seed proxy pool from env at startup (workers also seed from settings).
   if (env.proxyList.length) {
     await new ProxyPool().seed(env.proxyList).catch((e) => logger.warn({ err: e.message }, "proxy seed failed"));
   }
 
+  // Schedule the price-alert repeatable job (idempotent).
   await schedulePriceAlertJob().catch((e) => logger.warn({ err: e.message }, "price alert schedule failed"));
 
   console.log('🔄 3. Пытаюсь запустить бота (bot.launch())...');
-
-  // Повторные попытки при ошибке 409
-  let attempts = 0;
-  while (attempts < 3) {
-    try {
-      await bot.launch();
-      console.log('✅ 4. Бот успешно запущен');
-      break;
-    } catch (e) {
-      const err = e as Error;
-      if (err.message.includes('409') || err.message.includes('Conflict')) {
-        attempts++;
-        console.log(`⚠️ Конфликт (409), попытка ${attempts} из 3. Ждём 2 секунды...`);
-        if (attempts < 3) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          // Повторно удаляем вебхук и завершаем обновления
-          await bot.telegram.deleteWebhook().catch(() => {});
-          try {
-            const updates = await bot.telegram.callApi('getUpdates', { limit: 1 });
-            if (updates && Array.isArray(updates) && updates.length > 0) {
-              const lastUpdateId = (updates[0] as any).update_id;
-              await bot.telegram.callApi('getUpdates', { offset: lastUpdateId + 1, limit: 0 });
-            }
-          } catch (_) {}
-        } else {
-          throw err;
-        }
-      } else {
-        throw err;
-      }
-    }
-  }
-
+  await bot.launch();
+  console.log('✅ 4. Бот успешно запущен');
   logger.info("Bot started (long-polling)");
 
   const shutdown = async (sig: string) => {
     logger.info({ sig }, "Shutting down bot");
     bot.stop(sig);
+    await releaseLock();
     await disconnectPrisma();
     process.exit(0);
   };
