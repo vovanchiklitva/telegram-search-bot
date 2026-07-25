@@ -25,6 +25,15 @@ async function bootstrap(): Promise<void> {
     console.log('⚠️ Ошибка удаления вебхука:', (e as Error).message);
   }
 
+  // Принудительно останавливаем возможный старый polling
+  console.log('🔄 Останавливаем возможный старый процесс...');
+  try {
+    await bot.stop();
+    console.log('✅ Предыдущий процесс остановлен');
+  } catch (e) {
+    console.log('⚠️ Не удалось остановить предыдущий процесс (скорее всего, его нет)');
+  }
+
   // Redis-backed sessions
   bot.use(
     session({
@@ -43,7 +52,7 @@ async function bootstrap(): Promise<void> {
   await schedulePriceAlertJob().catch((e) => logger.warn({ err: e.message }, "price alert schedule failed"));
 
   console.log('🔄 3. Пытаюсь запустить бота (bot.launch())...');
-  
+
   // Повторные попытки при ошибке 409
   let attempts = 0;
   while (attempts < 3) {
