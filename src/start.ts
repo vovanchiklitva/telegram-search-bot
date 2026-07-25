@@ -1,8 +1,8 @@
 import express from 'express';
 
-// Запускаем бота и воркера параллельно
-import('./bot');
-import('./worker');
+// Запускаем бота и воркера (пути относительно корня проекта)
+import('./dist/bot/index.js');
+import('./dist/worker/index.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
