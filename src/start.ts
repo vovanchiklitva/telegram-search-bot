@@ -1,8 +1,8 @@
 import express from 'express';
 
-// Запускаем бота и воркера (пути относительно корня проекта)
-import('./dist/bot/index.js');
-import('./dist/worker/index.js');
+// Импортируем исходные модули (они запустятся при импорте)
+import './bot/index';
+import './worker/index';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
