@@ -28,10 +28,11 @@ async function bootstrap(): Promise<void> {
   // Шаг 2: Принудительно завершаем все старые long-polling сеансы
   console.log('🔄 Завершаем старые обновления...');
   try {
-    const updates = await bot.telegram.getUpdates({ limit: 1 });
-    if (updates.length > 0) {
+    // Используем callApi для обхода типов
+    const updates = await bot.telegram.callApi('getUpdates', { limit: 1 });
+    if (updates && Array.isArray(updates) && updates.length > 0) {
       const lastUpdateId = updates[0].update_id;
-      await bot.telegram.getUpdates({ offset: lastUpdateId + 1, limit: 0 });
+      await bot.telegram.callApi('getUpdates', { offset: lastUpdateId + 1, limit: 0 });
       console.log(`✅ Старые обновления завершены, offset=${lastUpdateId + 1}`);
     } else {
       console.log('✅ Нет старых обновлений');
@@ -82,12 +83,12 @@ async function bootstrap(): Promise<void> {
         console.log(`⚠️ Конфликт (409), попытка ${attempts} из 3. Ждём 2 секунды...`);
         if (attempts < 3) {
           await new Promise(resolve => setTimeout(resolve, 2000));
-          // Повторно удаляем вебхук и завершаем обновления
+          // Повторно удаляем вебхук и завершаем обновления через callApi
           await bot.telegram.deleteWebhook().catch(() => {});
           try {
-            const updates = await bot.telegram.getUpdates({ limit: 1 });
-            if (updates.length > 0) {
-              await bot.telegram.getUpdates({ offset: updates[0].update_id + 1, limit: 0 });
+            const updates = await bot.telegram.callApi('getUpdates', { limit: 1 });
+            if (updates && Array.isArray(updates) && updates.length > 0) {
+              await bot.telegram.callApi('getUpdates', { offset: updates[0].update_id + 1, limit: 0 });
             }
           } catch (_) {}
         } else {
