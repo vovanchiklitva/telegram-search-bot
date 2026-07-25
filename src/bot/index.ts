@@ -47,7 +47,6 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (sig: string) => {
     logger.info({ sig }, "Shutting down bot");
     bot.stop(sig);
-    await releaseLock();
     await disconnectPrisma();
     process.exit(0);
   };
