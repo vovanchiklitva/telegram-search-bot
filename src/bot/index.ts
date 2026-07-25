@@ -20,30 +20,6 @@ async function bootstrap(): Promise<void> {
   const bot = new Telegraf<BotContext>(env.botToken);
   console.log('🔄 2. Бот создан');
 
-  // Блокировка для предотвращения множественных запусков
-const redis = new Redis(env.redisUrl);
-const lockKey = 'bot:running';
-const lockValue = process.pid.toString();
-const lockTtl = 60; // секунд
-
-// Пытаемся установить блокировку
-const acquired = await redis.set(lockKey, lockValue, 'EX', lockTtl, 'NX');
-if (!acquired) {
-  console.log('❌ Бот уже запущен в другом процессе. Завершаюсь.');
-  await redis.quit();
-  process.exit(0);
-}
-console.log('✅ Блокировка получена, запускаю бота...');
-
-// При завершении бота удаляем блокировку
-const releaseLock = async () => {
-  const current = await redis.get(lockKey);
-  if (current === lockValue) {
-    await redis.del(lockKey);
-  }
-  await redis.quit();
-};
-
   // Redis-backed sessions → stateless across instances.
   bot.use(
     session({
