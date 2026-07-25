@@ -26,24 +26,6 @@ const lockKey = 'bot:running';
 const lockValue = process.pid.toString();
 const lockTtl = 60; // секунд
 
-// Пытаемся установить блокировку
-const acquired = await redis.set(lockKey, lockValue, 'EX', lockTtl, 'NX');
-if (!acquired) {
-  console.log('❌ Бот уже запущен в другом процессе. Завершаюсь.');
-  await redis.quit();
-  process.exit(0);
-}
-console.log('✅ Блокировка получена, запускаю бота...');
-
-// При завершении бота удаляем блокировку
-const releaseLock = async () => {
-  const current = await redis.get(lockKey);
-  if (current === lockValue) {
-    await redis.del(lockKey);
-  }
-  await redis.quit();
-};
-
   // Redis-backed sessions → stateless across instances.
   bot.use(
     session({
@@ -71,7 +53,6 @@ const releaseLock = async () => {
   const shutdown = async (sig: string) => {
     logger.info({ sig }, "Shutting down bot");
     bot.stop(sig);
-    await releaseLock();
     await disconnectPrisma();
     process.exit(0);
   };
