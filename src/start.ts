@@ -4,28 +4,14 @@ import { spawn } from 'child_process';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/health', (req, res) => {
-  res.send('OK');
-});
+app.get('/health', (req, res) => res.send('OK'));
+app.listen(PORT, () => console.log(`✅ Health check сервер запущен на порту ${PORT}`));
 
-app.listen(PORT, () => {
-  console.log(`✅ Health check сервер запущен на порту ${PORT}`);
-});
+// Запускаем бота и воркера напрямую (без npm)
+const bot = spawn('node', ['dist/bot/index.js'], { stdio: 'inherit' });
+const worker = spawn('node', ['dist/worker/index.js'], { stdio: 'inherit' });
 
-// Запускаем бота и воркера как отдельные процессы
-const bot = spawn('npm', ['run', 'start:bot'], { stdio: 'inherit' });
-const worker = spawn('npm', ['run', 'start:worker'], { stdio: 'inherit' });
-
-process.on('SIGINT', () => {
-  bot.kill();
-  worker.kill();
-  process.exit();
-});
-
-process.on('SIGTERM', () => {
-  bot.kill();
-  worker.kill();
-  process.exit();
-});
+process.on('SIGINT', () => { bot.kill(); worker.kill(); process.exit(); });
+process.on('SIGTERM', () => { bot.kill(); worker.kill(); process.exit(); });
 
 console.log('✅ Бот и воркер запущены');
