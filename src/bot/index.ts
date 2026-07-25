@@ -16,23 +16,34 @@ async function bootstrap(): Promise<void> {
   const bot = new Telegraf<BotContext>(env.botToken);
   console.log('🔄 2. Бот создан');
 
-  // Принудительно удаляем вебхук (чтобы не было конфликтов)
-  console.log('🔄 Удаляем вебхук...');
+  // Шаг 1: Удаляем вебхук и ждём 5 секунд
+  console.log('🔄 Удаляем вебхук и ждём 5 секунд...');
   try {
     await bot.telegram.deleteWebhook();
     console.log('✅ Вебхук удалён');
   } catch (e) {
     console.log('⚠️ Ошибка удаления вебхука:', (e as Error).message);
   }
+  await new Promise(resolve => setTimeout(resolve, 5000));
 
-  // Принудительно останавливаем возможный старый polling
-  console.log('🔄 Останавливаем возможный старый процесс...');
+  // Шаг 2: Пытаемся остановить старый polling (если он есть)
+  console.log('🔄 Пытаемся остановить старый процесс (если есть)...');
   try {
     await bot.stop();
-    console.log('✅ Предыдущий процесс остановлен');
+    console.log('✅ Процесс остановлен');
   } catch (e) {
-    console.log('⚠️ Не удалось остановить предыдущий процесс (скорее всего, его нет)');
+    console.log('⚠️ Не удалось остановить (возможно, его нет)');
   }
+
+  // Шаг 3: Ещё раз удаляем вебхук и ждём 3 секунды
+  console.log('🔄 Повторное удаление вебхука и ожидание 3 секунды...');
+  try {
+    await bot.telegram.deleteWebhook();
+    console.log('✅ Вебхук удалён повторно');
+  } catch (e) {
+    console.log('⚠️ Ошибка повторного удаления вебхука:', (e as Error).message);
+  }
+  await new Promise(resolve => setTimeout(resolve, 3000));
 
   // Redis-backed sessions
   bot.use(
@@ -53,9 +64,9 @@ async function bootstrap(): Promise<void> {
 
   console.log('🔄 3. Пытаюсь запустить бота (bot.launch())...');
 
-  // Повторные попытки при ошибке 409
+  // Основной запуск с повторными попытками
   let attempts = 0;
-  while (attempts < 3) {
+  while (attempts < 5) { // увеличено до 5 попыток
     try {
       await bot.launch();
       console.log('✅ 4. Бот успешно запущен');
@@ -64,13 +75,13 @@ async function bootstrap(): Promise<void> {
       const err = e as Error;
       if (err.message.includes('409') || err.message.includes('Conflict')) {
         attempts++;
-        console.log(`⚠️ Конфликт (409), попытка ${attempts} из 3. Ждём 2 секунды...`);
-        if (attempts < 3) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          // Повторно удаляем вебхук перед повторной попыткой
+        console.log(`⚠️ Конфликт (409), попытка ${attempts} из 5. Ждём 3 секунды...`);
+        if (attempts < 5) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          // Снова удаляем вебхук
           await bot.telegram.deleteWebhook().catch(() => {});
         } else {
-          throw err; // после 3 попыток бросаем ошибку
+          throw err;
         }
       } else {
         throw err;
