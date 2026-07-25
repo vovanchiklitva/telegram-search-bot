@@ -1,0 +1,126 @@
+// Prisma schema for Shop Search Telegram Bot.
+// PostgreSQL is the durable store; Redis holds sessions, queues and caches.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A Telegram user. The telegramId is the stable cross-platform identity.
+// consent = true means we are allowed to store history, favorites and alerts.
+// When consent = false we only persist telegramId + city (delivery routing).
+model User {
+  id           BigInt   @id @default(autoincrement())
+  telegramId   BigInt   @unique
+  username     String?
+  firstName    String?
+  city         String?
+  lat          Float?
+  lon          Float?
+  consent      Boolean  @default(false)
+  minimalMode  Boolean  @default(false)
+  language     String   @default("ru")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  searches     SearchHistory[]
+  favorites    Favorite[]
+  priceAlerts  PriceAlert[]
+  searchStates UserSearchState[]
+
+  @@map("users")
+}
+
+// Persistent search history (only written when user.consent = true).
+model SearchHistory {
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query      String
+  city       String?
+  parsedJson Json?
+  resultCount Int     @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("search_history")
+}
+
+// A saved product the user is interested in (favorites).
+model Favorite {
+  id           BigInt   @id @default(autoincrement())
+  userId       BigInt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId    String
+  source       String
+  title        String
+  url          String
+  priceRub     Decimal  @db.Decimal(12, 2)
+  imageUrl     String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@unique([userId, productId, source])
+  @@map("favorites")
+}
+
+// A price-watch entry: notify when current price drops below targetPriceRub.
+model PriceAlert {
+  id             BigInt   @id @default(autoincrement())
+  userId         BigInt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favoriteId     BigInt?  @map("favorite_id")
+  productId      String
+  source         String
+  title          String
+  targetPriceRub Decimal  @db.Decimal(12, 2) @map("target_price_rub")
+  lastPriceRub   Decimal? @db.Decimal(12, 2) @map("last_price_rub")
+  lastCheckedAt  DateTime? @map("last_checked_at")
+  triggeredAt    DateTime? @map("triggered_at")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([active])
+  @@map("price_alerts")
+}
+
+// Conversational state for parameter refinement flows.
+// Kept minimal because the session lives in Redis; this is a fallback
+// for multi-step parameter refinement that must survive restarts.
+model UserSearchState {
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  step       String
+  payload    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("user_search_states")
+}
+
+// Admin-managed settings: enabled sources, delivery thresholds, proxy list, A/B buttons.
+model Setting {
+  id    BigInt  @id @default(autoincrement())
+  key   String  @unique
+  value Json
+
+  @@map("settings")
+}
+
+// Daily aggregates of top queries (admin analytics). Lightweight.
+model TopQuery {
+  id        BigInt   @id @default(autoincrement())
+  day       DateTime @db.Date
+  query     String
+  count     Int      @default(0)
+
+  @@unique([day, query])
+  @@index([day, count])
+  @@map("top_queries")
+}
