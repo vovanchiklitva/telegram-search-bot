@@ -1,5 +1,3 @@
-по итогу получается так?
-
 // Bot entry point. Starts long-polling. Stateless: sessions live in Redis,
 // queues in Redis, persistent data in Postgres. Multiple instances can run
 // behind a load balancer (use webhooks in prod; polling is fine for dev).
