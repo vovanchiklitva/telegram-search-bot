@@ -20,6 +20,38 @@ async function bootstrap(): Promise<void> {
   const bot = new Telegraf<BotContext>(env.botToken);
   console.log('🔄 2. Бот создан');
 
+  // 1. Принудительно удаляем вебхук (чтобы не было конфликтов с другим экземпляром)
+  console.log('🔄 Удаляем вебхук...');
+  try {
+    await bot.telegram.deleteWebhook();
+    console.log('✅ Вебхук удалён');
+  } catch (e) {
+    console.log('⚠️ Ошибка удаления вебхука:', (e as Error).message);
+  }
+
+  // 2. Блокировка Redis для предотвращения множественных запусков
+  const redis = new Redis(env.redisUrl);
+  const lockKey = 'bot:running';
+  const lockValue = process.pid.toString();
+  const lockTtl = 60; // секунд
+
+  const acquired = await redis.set(lockKey, lockValue, 'EX', lockTtl, 'NX');
+  if (!acquired) {
+    console.log('⚠️ Бот уже запущен в другом процессе, завершаюсь.');
+    await redis.quit();
+    process.exit(0);
+  }
+  console.log('✅ Блокировка получена, запускаю бота...');
+
+  // Функция для освобождения блокировки
+  const releaseLock = async () => {
+    const current = await redis.get(lockKey);
+    if (current === lockValue) {
+      await redis.del(lockKey);
+    }
+    await redis.quit();
+  };
+
   // Redis-backed sessions → stateless across instances.
   bot.use(
     session({
@@ -47,6 +79,7 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (sig: string) => {
     logger.info({ sig }, "Shutting down bot");
     bot.stop(sig);
+    await releaseLock();
     await disconnectPrisma();
     process.exit(0);
   };
