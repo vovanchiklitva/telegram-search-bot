@@ -8,10 +8,6 @@ app.get('/health', (req, res) => {
   res.send('OK');
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Health check сервер запущен на порту ${PORT}`);
-});
-
 // Запускаем бота и воркера как отдельные процессы
 const bot = spawn('npm', ['run', 'start:bot'], { stdio: 'inherit' });
 const worker = spawn('npm', ['run', 'start:worker'], { stdio: 'inherit' });
