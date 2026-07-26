@@ -1,8 +1,6 @@
 // src/worker/index.ts
-import '../queues/workers/search.worker.js';
-import '../queues/workers/price-alert.worker.js';
-
+// Временная заглушка — реальные воркеры будут добавлены позже
 export async function startWorker() {
-  console.log('👷 Воркеры запущены');
-  // Здесь можно добавить инициализацию, если нужно
+  console.log('👷 Воркеры (заглушка) — фоновые задачи не обрабатываются');
+  // Здесь позже добавим реальные воркеры
 }
