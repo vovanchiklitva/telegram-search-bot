@@ -9,7 +9,6 @@ import type { ParsedQuery } from "../types.js";
 import { Cache, hashStr, hashBuffer } from "../utils/cache.js";
 import { logger } from "../utils/logger.js";
 
-const EMBED_MODEL = "text-embedding-3-small";
 const VISION_TIMEOUT_MS = 3000; // spec: fall back to text on timeout
 
 export class OpenAIService {
@@ -17,7 +16,12 @@ export class OpenAIService {
   private cache: Cache;
 
   constructor(cache?: Cache) {
-    this.client = new OpenAI({ apiKey: env.openaiApiKey, timeout: 10_000, maxRetries: 1 });
+    this.client = new OpenAI({
+  apiKey: env.openaiApiKey,
+  baseURL: env.openaiBaseUrl || undefined,
+  timeout: 10_000,
+  maxRetries: 1,
+});
     this.cache = cache ?? new Cache();
   }
 
@@ -35,7 +39,7 @@ attributes (объект ключ-значение или null), minPrice (чи�
 
     try {
       const completion = await this.client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: env.aiChatModel,
         temperature: 0,
         response_format: { type: "json_object" },
         messages: [
@@ -75,7 +79,7 @@ attributes (объект ключ-значение или null), minPrice (чи�
     try {
       const completion = await this.client.chat.completions.create(
         {
-          model: "gpt-4o-mini",
+          model: env.aiChatModel,
           temperature: 0,
           max_tokens: 60,
           messages: [
@@ -106,7 +110,7 @@ attributes (объект ключ-значение или null), minPrice (чи�
     const key = `cache:emb:${hashStr(title)}`;
     const cached = await this.cache.getJson<number[]>(key);
     if (cached) return cached;
-    const res = await this.client.embeddings.create({ model: EMBED_MODEL, input: title });
+    const res = await this.client.embeddings.create({ model: env.aiEmbedModel, input: title });
     const vec = res.data[0]?.embedding ?? [];
     await this.cache.setJson(key, vec, 86400);
     return vec;
