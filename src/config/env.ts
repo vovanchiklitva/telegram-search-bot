@@ -45,6 +45,9 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   redisUrl: required("REDIS_URL"),
   openaiApiKey: required("OPENAI_API_KEY"),
+  openaiBaseUrl: optional("OPENAI_BASE_URL"),
+  aiChatModel: optional("AI_CHAT_MODEL", "gpt-4o-mini"),
+  aiEmbedModel: optional("AI_EMBED_MODEL", "text-embedding-3-small"),,
 
   wbApiKey: optional("WB_API_KEY"),
   ozonApiKey: optional("OZON_API_KEY"),
