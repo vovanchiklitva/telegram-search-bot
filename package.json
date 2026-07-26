@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Telegram bot for product search across Russian marketplaces",
+  "postinstall": "rm -rf /opt/render/.cache/puppeteer && npx puppeteer browsers install chrome",
   "main": "dist/bot/index.js",
   "scripts": {
     "postinstall": "npx puppeteer browsers install chrome",
