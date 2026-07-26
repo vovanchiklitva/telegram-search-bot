@@ -6,6 +6,7 @@
   "description": "Telegram bot for product search across Russian marketplaces",
   "main": "dist/bot/index.js",
   "scripts": {
+    "postinstall": "npx puppeteer browsers install chrome",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/start.js",
     "start:bot": "node dist/bot/index.js",
