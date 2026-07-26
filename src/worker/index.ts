@@ -1,5 +1,11 @@
 import express from 'express';
-import { spawn } from 'child_process';
+import '../queues/workers/search.worker.js';
+import '../queues/workers/price-alert.worker.js';
+
+export async function startWorker() {
+  console.log('👷 Воркеры запущены');
+  // Здесь можно добавить инициализацию, если нужно
+}
 
 // HTTP-сервер для health check (чтобы Render не отключал сервис)
 const app = express();
