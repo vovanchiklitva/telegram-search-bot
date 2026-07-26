@@ -32,8 +32,11 @@ interface WbSearchResponse {
 
 export class WildberriesClient implements SourceClient {
   readonly source = "wildberries" as const;
-  private readonly base = makeAxios("https://search.wb.ru", 10_000);
-
+  private readonly base = makeAxios("https://search.wb.ru", 10_000, {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    Accept: "*/*",
+    Referer: "https://www.wildberries.ru/",
+    
   async search(ctx: SearchContext, timeoutMs: number): Promise<Product[]> {
     const settings = await getRepositories().settings.get();
     if (!settings.enabledSources.includes("wildberries")) return [];
