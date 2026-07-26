@@ -14,6 +14,7 @@ import {
   type SearchJobResult,
   getQueueEvents,
   API_QUEUE,
+  PARSER_QUEUE,
 } from "./queues.js";
 import { env } from "../config/env.js";
 import { Cache } from "../utils/cache.js";
@@ -57,9 +58,9 @@ export class SearchOrchestrator {
     const apiSources = API_SOURCES.filter((s) => settings.enabledSources.includes(s));
     const parserSources = PARSER_SOURCES.filter((s) => settings.enabledSources.includes(s));
 
-    const apiJobs = apiSources.map((source) => this.enqueue(getApiQueue(), source, input, parsed, requestId, env.timeoutApiMs));
-    const parserJobs = parserSources.map((source) => this.enqueue(getParserQueue(), source, input, parsed, requestId, env.timeoutParserMs));
-
+  const apiJobs = apiSources.map((source) => this.enqueue(getApiQueue(), source, input, parsed, requestId, env.timeoutApiMs).then((r) => ({ ...r, queueName: API_QUEUE })));
+    const parserJobs = parserSources.map((source) => this.enqueue(getParserQueue(), source, input, parsed, requestId, env.timeoutParserMs).then((r) => ({ ...r, queueName: PARSER_QUEUE })));
+    
     const allJobs = [...apiJobs, ...parserJobs];
     if (allJobs.length === 0) {
       return this.fallbackCached(cached, input, parsed, "Все источники отключены", [], now);
@@ -71,10 +72,10 @@ export class SearchOrchestrator {
     // Wait for each job, respecting a per-source timeout (handled by the worker).
     await Promise.all(
       allJobs.map(async (jobPromise) => {
-        const { source, job } = await jobPromise;
+        const { source, job, queueName } = await jobPromise;
         await onStatus(`🔍 Ищем на ${labelOf(source)}...`);
         try {
-          const result = await job.waitUntilFinished(getQueueEvents(API_QUEUE), env.timeoutParserMs + 2000).catch(() => null);
+          const result = await job.waitUntilFinished(getQueueEvents(queueName), env.timeoutParserMs + 2000).catch(() => null);
           if (!result || result.error) {
             failedSources.push(source as Source);
             return;
