@@ -51,8 +51,15 @@ export function getPriceAlertQueue(): Queue<PriceAlertJobData> {
   return priceQueue;
 }
 
+const queueEventsCache = new Map<string, QueueEvents>();
+
 export function getQueueEvents(name: string): QueueEvents {
-  return new QueueEvents(name, { connection: getRedisForQueue() });
+  let events = queueEventsCache.get(name);
+  if (!events) {
+    events = new QueueEvents(name, { connection: getRedisForQueue() });
+    queueEventsCache.set(name, events);
+  }
+  return events;
 }
 
 // Get total waiting+delayed count across both search queues. Used by the
