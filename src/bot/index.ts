@@ -20,11 +20,11 @@ async function bootstrap(): Promise<void> {
   const bot = new Telegraf<BotContext>(env.botToken);
   console.log('🔄 2. Бот создан');
 
-  // Блокировка для предотвращения множественных запусков
-const redis = new Redis(env.redisUrl);
-const lockKey = 'bot:running';
-const lockValue = process.pid.toString();
-const lockTtl = 60; // секунд
+  // Блокировка для предотвращения множественных запусков (опционально)
+  const redis = new Redis(env.redisUrl);
+  const lockKey = 'bot:running';
+  const lockValue = process.pid.toString();
+  const lockTtl = 60; // секунд
 
   // Redis-backed sessions → stateless across instances.
   bot.use(
@@ -65,8 +65,7 @@ const lockTtl = 60; // секунд
   });
 }
 
-bootstrap().catch(async (err) => {
-  console.error("❌ Ошибка в bootstrap бота:", err);
-  logger.fatal({ err: err.message, stack: err.stack }, "Bot bootstrap failed");
-  process.exit(1);
-});
+// Экспортируем функцию для запуска, но НЕ вызываем её автоматически
+export async function startBot() {
+  await bootstrap();
+}
