@@ -12,7 +12,7 @@ export async function startWorker() {
   const notifierBot = new Telegraf(env.botToken);
 
   startApiWorker();
-  startParserWorker();
+  startParserWorker(1); // 1 at a time — headless Chrome is heavy, free-tier RAM is limited
   startPriceAlertWorker(notifierBot);
 
   logger.info("Воркеры запущены: api-search, parser-search, price-alerts");
