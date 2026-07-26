@@ -38,13 +38,22 @@ export class WildberriesClient implements SourceClient {
     const settings = await getRepositories().settings.get();
     if (!settings.enabledSources.includes("wildberries")) return [];
 
-    const dest = await this.resolveDest(ctx.city);
-    const url = "/exact/search/0";
+     const dest = await this.resolveDest(ctx.city);
+    const url = "/exactmatch/ru/common/v13/search";
     const params = {
-      query: ctx.query,
+      ab_testing: false,
+      appType: 1,
+      curr: "rub",
       dest: dest ?? -1257786, // Moscow fallback
-      limit: 30,
+      lang: "ru",
+      page: 1,
+      query: ctx.query,
+      resultset: "catalog",
+      sort: "popular",
+      spp: 30,
+      suppressSpellcheck: false,
     };
+    
     const { data } = await this.base.get<WbSearchResponse>(url, { params, timeout: timeoutMs });
     const products = data?.data?.products ?? [];
     const thresholds = settings.deliveryThresholds;
