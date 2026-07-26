@@ -158,7 +158,7 @@ export class SearchOrchestrator {
       timeoutMs,
     };
     const job = await queue.add(`search:${source}`, data, {
-      jobId: `${requestId}:${source}`,
+      jobId: `${requestId}-${source}`,
       removeOnComplete: 100,
       removeOnFail: 100,
     });
