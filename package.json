@@ -3,10 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "postinstall": "rm -rf /opt/render/.cache/puppeteer && npx puppeteer browsers install chrome",
   "main": "dist/bot/index.js",
   "scripts": {
-    "postinstall": "npx puppeteer browsers install chrome",
+    "postinstall": "rm -rf /opt/render/.cache/puppeteer && npx puppeteer browsers install chrome",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/start.js",
     "start:bot": "node dist/bot/index.js",
